@@ -1,0 +1,112 @@
+﻿@page "/item"
+@inject IListItemRepository listItemRepository
+@inject IJSRuntime jsRuntime
+
+<ShoppingList.WebServer.Pages.Components._DeleteConfirmation IsParentComponentProcessing="IsLoading" ConfirmationChanged="ConfirmDelete_Click"></ShoppingList.WebServer.Pages.Components._DeleteConfirmation>
+<div class="row mt-4">
+    <div class="col-6">
+        <h4 class="card-title text-primary">Item List</h4>
+    </div>
+    <div class="col-4 offset-2">
+        <a href="item/create" class="btn btn-primary form-control">Add New Item</a>
+    </div>
+</div>
+
+<div class="col-12 p-3">
+    @if (Items.Any())
+    {
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Is Bought</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var obj in Items)
+                {
+                    <tr>
+                        @if (obj.IsBought)
+                        {
+                            <td><s>@obj.Product</s></td>
+                        }
+                        else
+                        {
+                            <td>@obj.Product</td>
+                        }
+                        <td>@obj.Quantity</td>
+                        <td><InputCheckbox @onclick="()=>HandleIsBoughtChange(obj)" @bind-Value="@obj.IsBought" class="form-check"></InputCheckbox></td>
+                        <td>
+                            <NavLink href="@($"item/edit/{obj.Id}")" class="btn-primary btn">Edit</NavLink>
+                            <button class="btn btn-danger" @onclick="()=>HandleDelete(obj.Id)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        if (IsLoading)
+        {
+            // loading gif
+            <div class="text-center">
+                <img src="/images/loading2.gif" />
+            </div>
+        }
+        else
+        {
+            // no records
+            <p>No records found.</p>
+        }
+    }
+</div>
+
+@code {
+    private IEnumerable<ListItemDTO> Items { get; set; } = new List<ListItemDTO>();
+    public bool IsLoading { get; set; }
+    private int DeleteId { get; set; } = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Load();
+        }
+    }
+
+    private async Task Load()
+    {
+        IsLoading = true;
+        StateHasChanged();
+        Items = await listItemRepository.GetAllAsync();
+        IsLoading = false;
+        StateHasChanged();
+    }
+
+    private void HandleDelete(int id)
+    {
+        DeleteId = id;
+        jsRuntime.InvokeVoidAsync("ShowDeleteConfirmationModal");
+    }
+
+    private async void HandleIsBoughtChange(ListItemDTO item)
+    {
+        await listItemRepository.UpdateAsync(item);
+        await Load();
+    }
+
+    public async Task ConfirmDelete_Click(bool isConfirmed)
+    {
+        IsLoading = true;
+        if (isConfirmed && DeleteId != 0)
+        {
+            await listItemRepository.RemoveAsync(DeleteId);
+            await Load();
+            await jsRuntime.InvokeVoidAsync("HideDeleteConfirmationModal");
+        }
+        IsLoading = false;
+    }
+}
